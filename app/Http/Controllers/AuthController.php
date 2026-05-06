@@ -1,0 +1,328 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RegisterRequest;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use OpenApi\Attributes as OA;
+
+class AuthController extends Controller
+{
+    #[OA\Post(
+        path: '/api/auth/register',
+        summary: 'Registrar un nuevo usuario',
+        description: 'Crea una nueva cuenta de usuario y devuelve un token de acceso.',
+        operationId: 'register',
+        tags: ['Autenticación'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name', 'email', 'password', 'password_confirmation'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', example: 'Juan Pérez', description: 'Nombre completo del usuario'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'juan@example.com', description: 'Correo electrónico'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123', description: 'Contraseña (mínimo 8 caracteres)'),
+                    new OA\Property(property: 'password_confirmation', type: 'string', format: 'password', example: 'password123', description: 'Confirmación de la contraseña'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Usuario registrado exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Usuario registrado exitosamente'),
+                        new OA\Property(property: 'user', type: 'object', properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'Juan Pérez'),
+                            new OA\Property(property: 'email', type: 'string', example: 'juan@example.com'),
+                            new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+                        ]),
+                        new OA\Property(property: 'token', type: 'string', example: '1|abc123def456...'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Error de validación',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'El correo electrónico ya está registrado.'),
+                        new OA\Property(property: 'errors', type: 'object'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function register(RegisterRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Usuario registrado exitosamente',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'created_at' => $user->created_at,
+            ],
+            'token' => $token,
+        ], 201);
+    }
+
+    #[OA\Post(
+        path: '/api/auth/login',
+        summary: 'Iniciar sesión',
+        description: 'Autentica un usuario y devuelve un token de acceso.',
+        operationId: 'login',
+        tags: ['Autenticación'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'password'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'juan@example.com', description: 'Correo electrónico'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123', description: 'Contraseña'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Inicio de sesión exitoso',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Inicio de sesión exitoso'),
+                        new OA\Property(property: 'user', type: 'object', properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'Juan Pérez'),
+                            new OA\Property(property: 'email', type: 'string', example: 'juan@example.com'),
+                        ]),
+                        new OA\Property(property: 'token', type: 'string', example: '1|abc123def456...'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Credenciales inválidas',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Credenciales inválidas'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Error de validación',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'El correo electrónico es obligatorio.'),
+                        new OA\Property(property: 'errors', type: 'object'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function login(LoginRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Credenciales inválidas',
+            ], 401);
+        }
+
+        // Revocar tokens anteriores (opcional: mantener solo el token actual)
+        $user->tokens()->delete();
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Inicio de sesión exitoso',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+            'token' => $token,
+        ], 200);
+    }
+
+    #[OA\Post(
+        path: '/api/auth/logout',
+        summary: 'Cerrar sesión',
+        description: 'Revoca el token de acceso del usuario autenticado.',
+        operationId: 'logout',
+        tags: ['Autenticación'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Sesión cerrada exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Sesión cerrada exitosamente'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'No autenticado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'No autenticado'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Sesión cerrada exitosamente',
+        ], 200);
+    }
+
+    #[OA\Get(
+        path: '/api/auth/profile',
+        summary: 'Obtener perfil del usuario',
+        description: 'Devuelve la información del usuario autenticado.',
+        operationId: 'profile',
+        tags: ['Autenticación'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Perfil del usuario',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'user', type: 'object', properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'Juan Pérez'),
+                            new OA\Property(property: 'email', type: 'string', example: 'juan@example.com'),
+                            new OA\Property(property: 'email_verified_at', type: 'string', format: 'date-time', nullable: true, example: null),
+                            new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+                            new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+                        ]),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'No autenticado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'No autenticado'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function profile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+            ],
+        ], 200);
+    }
+
+    #[OA\Put(
+        path: '/api/auth/profile',
+        summary: 'Actualizar perfil del usuario',
+        description: 'Actualiza la información del usuario autenticado.',
+        operationId: 'updateProfile',
+        tags: ['Autenticación'],
+        security: [['bearerAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', example: 'Juan Pérez Actualizado', description: 'Nuevo nombre'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'juan.nuevo@example.com', description: 'Nuevo correo electrónico'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Perfil actualizado exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Perfil actualizado exitosamente'),
+                        new OA\Property(property: 'user', type: 'object', properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'Juan Pérez Actualizado'),
+                            new OA\Property(property: 'email', type: 'string', example: 'juan.nuevo@example.com'),
+                            new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+                        ]),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'No autenticado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'No autenticado'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Error de validación',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'El correo electrónico ya está registrado.'),
+                        new OA\Property(property: 'errors', type: 'object'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'string', 'email', 'max:255', 'unique:users,email,' . $request->user()->id],
+        ]);
+
+        $user = $request->user();
+        $user->update($validated);
+
+        return response()->json([
+            'message' => 'Perfil actualizado exitosamente',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'updated_at' => $user->updated_at,
+            ],
+        ], 200);
+    }
+}
