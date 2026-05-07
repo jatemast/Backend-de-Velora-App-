@@ -1,6 +1,14 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\ClubController;
+use App\Http\Controllers\CourtController;
+use App\Http\Controllers\MatchController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\UserProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,13 +22,89 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Rutas de autenticación (públicas)
+// ==========================================
+// RUTAS PÚBLICAS
+// ==========================================
+
+// Auth público
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
-// Rutas de autenticación (protegidas)
+// Clubs públicos
+Route::get('clubs', [ClubController::class, 'index']);
+Route::get('clubs/slug/{slug}', [ClubController::class, 'showBySlug']);
+Route::get('clubs/{id}', [ClubController::class, 'show']);
+
+// Canchas públicas
+Route::get('clubs/{clubId}/courts', [CourtController::class, 'index']);
+Route::get('courts/{id}', [CourtController::class, 'show']);
+Route::get('courts/{id}/availability', [CourtController::class, 'checkAvailability']);
+Route::get('courts/{id}/available-slots', [CourtController::class, 'availableSlots']);
+
+// Reseñas públicas
+Route::get('reviews', [ReviewController::class, 'index']);
+
+// Partidos públicos
+Route::get('matches', [MatchController::class, 'index']);
+Route::get('matches/{id}', [MatchController::class, 'show']);
+
+// ==========================================
+// RUTAS PROTEGIDAS (Requieren autenticación Sanctum)
+// ==========================================
+
 Route::middleware('auth:sanctum')->group(function () {
+
+    // ========== AUTENTICACIÓN ==========
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/profile', [AuthController::class, 'profile']);
-    Route::put('/profile', [AuthController::class, 'updateProfile']);
+
+    // ========== PERFIL DE USUARIO ==========
+    Route::get('profile', [UserProfileController::class, 'show']);
+    Route::put('profile', [UserProfileController::class, 'update']);
+
+    // ========== CLUBS (Protegidas) ==========
+    Route::post('clubs', [ClubController::class, 'store']);
+    Route::put('clubs/{id}', [ClubController::class, 'update']);
+    Route::delete('clubs/{id}', [ClubController::class, 'destroy']);
+    Route::get('clubs/{clubId}/members', [ClubController::class, 'members']);
+    Route::post('clubs/{clubId}/members', [ClubController::class, 'addMember']);
+
+    // ========== CANCHAS (Protegidas) ==========
+    Route::post('clubs/{clubId}/courts', [CourtController::class, 'store']);
+    Route::put('courts/{id}', [CourtController::class, 'update']);
+    Route::delete('courts/{id}', [CourtController::class, 'destroy']);
+
+    // ========== RESERVAS ==========
+    Route::get('bookings', [BookingController::class, 'index']);
+    Route::post('bookings', [BookingController::class, 'store']);
+    Route::get('bookings/{id}', [BookingController::class, 'show']);
+    Route::post('bookings/{id}/confirm', [BookingController::class, 'confirm']);
+    Route::post('bookings/{id}/cancel', [BookingController::class, 'cancel']);
+    Route::post('bookings/{bookingId}/invite', [BookingController::class, 'invitePlayer']);
+    Route::post('bookings/{bookingId}/accept-invitation', [BookingController::class, 'acceptInvitation']);
+    Route::post('bookings/{bookingId}/decline-invitation', [BookingController::class, 'declineInvitation']);
+
+    // ========== PARTIDOS ==========
+    Route::post('matches', [MatchController::class, 'store']);
+    Route::put('matches/{id}/score', [MatchController::class, 'updateScore']);
+    Route::post('matches/{matchId}/join', [MatchController::class, 'join']);
+    Route::post('matches/{matchId}/leave', [MatchController::class, 'leave']);
+    Route::get('matchmaking/opponents', [MatchController::class, 'findOpponents']);
+
+    // ========== PAGOS ==========
+    Route::get('payments', [PaymentController::class, 'index']);
+    Route::post('bookings/{bookingId}/pay', [PaymentController::class, 'process']);
+    Route::get('payments/{id}', [PaymentController::class, 'show']);
+    Route::post('payments/{id}/refund', [PaymentController::class, 'refund']);
+
+    // ========== NOTIFICACIONES ==========
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::delete('notifications/{id}', [NotificationController::class, 'destroy']);
+
+    // ========== RESEÑAS ==========
+    Route::post('reviews', [ReviewController::class, 'store']);
+    Route::put('reviews/{id}', [ReviewController::class, 'update']);
+    Route::delete('reviews/{id}', [ReviewController::class, 'destroy']);
 });
