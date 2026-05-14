@@ -17,6 +17,7 @@ class Court extends Model
     protected $fillable = [
         'club_id',
         'name',
+        'sport_type',
         'description',
         'surface_type',
         'court_type',

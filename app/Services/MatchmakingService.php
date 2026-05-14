@@ -62,6 +62,21 @@ class MatchmakingService
             ]);
         });
 
+        // Filtrar por tipo de deporte (sport_type)
+        if (!empty($filters['sport_type'])) {
+            $query->whereHas('profile', function ($q) use ($filters) {
+                $q->where('preferred_sport', $filters['sport_type'])
+                  ->orWhere('preferences', 'like', "%{$filters['sport_type']}%");
+            });
+        }
+
+        // Filtrar por fecha (disponibilidad)
+        if (!empty($filters['date'])) {
+            $query->whereHas('profile', function ($q) use ($filters) {
+                $q->where('availability', 'like', "%{$filters['date']}%");
+            });
+        }
+
         return $query->paginate($filters['per_page'] ?? 10);
     }
 

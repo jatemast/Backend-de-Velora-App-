@@ -8,6 +8,11 @@ class ClubResource extends JsonResource
 {
     public function toArray($request): array
     {
+        // Obtener sport_type desde la primera cancha (si hay)
+        $firstCourt = $this->relationLoaded('courts') && $this->courts->isNotEmpty()
+            ? $this->courts->first()
+            : null;
+
         return [
             'id' => $this->id,
             'owner_id' => $this->owner_id,
@@ -28,6 +33,7 @@ class ClubResource extends JsonResource
             'opening_time' => $this->opening_time,
             'closing_time' => $this->closing_time,
             'is_active' => $this->is_active,
+            'sport_type' => $firstCourt?->sport_type,
             'owner' => new UserResource($this->whenLoaded('owner')),
             'courts' => CourtResource::collection($this->whenLoaded('courts')),
             'members_count' => $this->when($this->members_count, $this->members_count),
