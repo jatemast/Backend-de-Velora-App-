@@ -9,6 +9,7 @@ use App\Models\GameMatch;
 use App\Services\MatchmakingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class MatchController extends Controller
 {
@@ -16,6 +17,79 @@ class MatchController extends Controller
         protected MatchmakingService $matchmakingService
     ) {}
 
+    #[OA\Get(
+        path: "/api/matches",
+        summary: "Listar partidos disponibles",
+        description: "Obtiene una lista paginada de partidos disponibles para unirse, con opciones de filtrado.",
+        operationId: "listAvailableMatches",
+        tags: ["Partidos"],
+        parameters: [
+            new OA\Parameter(
+                name: "club_id",
+                in: "query",
+                required: false,
+                description: "Filtrar por ID de club",
+                schema: new OA\Schema(type: "integer")
+            ),
+            new OA\Parameter(
+                name: "match_type",
+                in: "query",
+                required: false,
+                description: "Filtrar por tipo de partido (ej. singles, doubles)",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "skill_level",
+                in: "query",
+                required: false,
+                description: "Filtrar por nivel de habilidad mínimo requerido para el partido",
+                schema: new OA\Schema(type: "integer", minimum: 1, maximum: 10)
+            ),
+            new OA\Parameter(
+                name: "sport_type",
+                in: "query",
+                required: false,
+                description: "Filtrar por tipo de deporte del partido (ej. Padel, Fútbol)",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "date",
+                in: "query",
+                required: false,
+                description: "Filtrar partidos para una fecha específica (YYYY-MM-DD)",
+                schema: new OA\Schema(type: "string", format: "date")
+            ),
+            new OA\Parameter(
+                name: "per_page",
+                in: "query",
+                required: false,
+                description: "Número de resultados por página",
+                schema: new OA\Schema(type: "integer", default: 15)
+            )
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Lista de partidos obtenida exitosamente",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "success", type: "boolean", example: true),
+                        new OA\Property(property: "data", type: "array", items: new OA\Items(ref: "#/components/schemas/GameMatchResource")),
+                        new OA\Property(
+                            property: "meta",
+                            type: "object",
+                            properties: [
+                                new OA\Property(property: "current_page", type: "integer"),
+                                new OA\Property(property: "last_page", type: "integer"),
+                                new OA\Property(property: "per_page", type: "integer"),
+                                new OA\Property(property: "total", type: "integer"),
+                            ]
+                        )
+                    ]
+                )
+            )
+        ]
+    )]
     /**
      * Listar partidos disponibles para unirse.
      */
@@ -122,6 +196,43 @@ class MatchController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        path: "/api/matchmaking/opponents",
+        summary: "Buscar oponentes por nivel de habilidad",
+        description: "Busca usuarios que puedan ser oponentes basándose en el nivel de habilidad.",
+        operationId: "findOpponents",
+        tags: ["Matchmaking"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(
+                name: "skill_range",
+                in: "query",
+                required: false,
+                description: "Rango de nivel de habilidad para buscar (ej. 2 para +/- 2 niveles del usuario)",
+                schema: new OA\Schema(type: "integer", default: 2)
+            ),
+            new OA\Parameter(
+                name: "per_page",
+                in: "query",
+                required: false,
+                description: "Número de resultados por página",
+                schema: new OA\Schema(type: "integer", default: 10)
+            )
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Oponentes encontrados exitosamente",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "success", type: "boolean", example: true),
+                        new OA\Property(property: "data", type: "array", items: new OA\Items(ref: "#/components/schemas/UserResource")),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: "No autenticado")
+        ]
+    )]
     /**
      * Buscar oponentes.
      */

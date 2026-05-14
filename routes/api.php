@@ -9,6 +9,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\ClubAdminController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,6 +30,10 @@ use Illuminate\Support\Facades\Route;
 // Auth público
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
+
+// Recuperación de Contraseña
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 // Clubs públicos
 Route::get('clubs', [ClubController::class, 'index']);
@@ -60,6 +65,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // ========== PERFIL DE USUARIO ==========
     Route::get('profile', [UserProfileController::class, 'show']);
     Route::put('profile', [UserProfileController::class, 'update']);
+
+    // ========== CANCHAS FAVORITAS ==========
+    Route::get('profile/favorite-courts', [UserProfileController::class, 'getFavoriteCourts']);
+    Route::post('profile/favorite-courts', [UserProfileController::class, 'addFavoriteCourt']);
+    Route::delete('profile/favorite-courts/{courtId}', [UserProfileController::class, 'removeFavoriteCourt']);
 
     // ========== CLUBS (Protegidas) ==========
     Route::post('clubs', [ClubController::class, 'store']);
@@ -107,4 +117,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('reviews', [ReviewController::class, 'store']);
     Route::put('reviews/{id}', [ReviewController::class, 'update']);
     Route::delete('reviews/{id}', [ReviewController::class, 'destroy']);
+
+    // ========== PANEL DE ADMINISTRACIÓN DEL CLUB ==========
+    Route::get('admin/clubs/{clubId}/summary', [ClubAdminController::class, 'getDashboardSummary']);
+    Route::get('admin/clubs/{clubId}/upcoming-bookings', [ClubAdminController::class, 'getUpcomingBookings']);
 });

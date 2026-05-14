@@ -8,6 +8,7 @@ use App\Models\Court;
 use App\Services\BookingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class CourtController extends Controller
 {
@@ -114,6 +115,62 @@ class CourtController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        path: "/api/courts/{id}/available-slots",
+        summary: "Obtener slots disponibles para una cancha",
+        description: "Obtiene los horarios disponibles para reservar una cancha en una fecha específica.",
+        operationId: "getAvailableCourtSlots",
+        tags: ["Canchas"],
+        parameters: [
+            new OA\Parameter(
+                name: "id",
+                in: "path",
+                required: true,
+                description: "ID de la cancha",
+                schema: new OA\Schema(type: "integer")
+            ),
+            new OA\Parameter(
+                name: "date",
+                in: "query",
+                required: true,
+                description: "Fecha para consultar disponibilidad (YYYY-MM-DD)",
+                schema: new OA\Schema(type: "string", format: "date")
+            ),
+            new OA\Parameter(
+                name: "duration",
+                in: "query",
+                required: false,
+                description: "Duración de cada slot en minutos (ej. 60)",
+                schema: new OA\Schema(type: "integer", default: 60)
+            )
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Slots disponibles obtenidos exitosamente",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "success", type: "boolean", example: true),
+                        new OA\Property(
+                            property: "data",
+                            type: "array",
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: "start_time", type: "string", format: "time", example: "10:00"),
+                                    new OA\Property(property: "end_time", type: "string", format: "time", example: "11:00"),
+                                    new OA\Property(property: "available", type: "boolean", example: true),
+                                    new OA\Property(property: "price_per_hour", type: "number", format: "float", example: 80000.00)
+                                ],
+                                type: "object"
+                            )
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 422, description: "Error de validación"),
+            new OA\Response(response: 404, description: "Cancha no encontrada")
+        ]
+    )]
     /**
      * Obtener slots disponibles.
      */

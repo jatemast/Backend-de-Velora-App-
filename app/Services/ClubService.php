@@ -32,6 +32,18 @@ class ClubService
             });
         }
 
+        if (!empty($filters['sport'])) {
+            $query->whereHas('courts', function ($q) use ($filters) {
+                $q->where('sport_type', $filters['sport']);
+            });
+        }
+
+        if (isset($filters['has_courts_for_sport']) && $filters['has_courts_for_sport'] === true && !empty($filters['sport'])) {
+            $query->whereHas('courts', function ($q) use ($filters) {
+                $q->where('sport_type', $filters['sport']);
+            });
+        }
+
         return $query->paginate($filters['per_page'] ?? 15);
     }
 

@@ -5,11 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\ForgotPasswordRequest;
+use App\Http\Requests\ResetPasswordRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\UpdateProfileRequest;
 use Illuminate\Support\Facades\Hash;
 use OpenApi\Attributes as OA;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -322,5 +327,115 @@ class AuthController extends Controller
                 'updated_at' => $user->updated_at,
             ],
         ], 200);
+    }
+
+    #[OA\Post(
+        path: '/api/forgot-password',
+        summary: 'Solicitar restablecimiento de contraseña',
+        description: 'Envía un enlace de restablecimiento de contraseña al correo electrónico del usuario.',
+        operationId: 'forgotPassword',
+        tags: ['Autenticación'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'juan@example.com', description: 'Correo electrónico del usuario')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Enlace de restablecimiento enviado exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Le hemos enviado por correo electrónico su enlace para restablecer la contraseña.')
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Error de validación o correo no encontrado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'No podemos encontrar un usuario con esa dirección de correo electrónico.'),
+                        new OA\Property(property: 'errors', type: 'object')
+                    ]
+                )
+            )
+        ]
+    )]
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $status = Password::sendResetLink(
+            $request->validated()
+        );
+
+        if ($status == Password::RESET_LINK_SENT) {
+            return response()->json(['message' => __($status)], 200);
+        }
+
+        return response()->json(['message' => __($status)], 422);
+    }
+
+    #[OA\Post(
+        path: '/api/reset-password',
+        summary: 'Restablecer contraseña',
+        description: 'Restablece la contraseña del usuario utilizando el token recibido por correo electrónico.',
+        operationId: 'resetPassword',
+        tags: ['Autenticación'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['token', 'email', 'password', 'password_confirmation'],
+                properties: [
+                    new OA\Property(property: 'token', type: 'string', example: 'some-reset-token', description: 'Token de restablecimiento de contraseña'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'juan@example.com', description: 'Correo electrónico del usuario'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'newpassword123', description: 'Nueva contraseña (mínimo 8 caracteres)'),
+                    new OA\Property(property: 'password_confirmation', type: 'string', format: 'password', example: 'newpassword123', description: 'Confirmación de la nueva contraseña')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Contraseña restablecida exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Su contraseña ha sido restablecida.')
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Error de validación o token inválido/expirado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Este token de restablecimiento de contraseña es inválido.'),
+                        new OA\Property(property: 'errors', type: 'object')
+                    ]
+                )
+            )
+        ]
+    )]
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $status = Password::reset(
+            $request->validated(),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password)
+                ])->setRememberToken(Str::random(60))->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status == Password::PASSWORD_RESET) {
+            return response()->json(['message' => __($status)], 200);
+        }
+
+        return response()->json(['message' => __($status)], 422);
     }
 }

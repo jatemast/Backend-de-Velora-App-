@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Models\Court;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -74,6 +75,120 @@ class UserProfileController extends Controller
             'success' => true,
             'message' => 'Perfil actualizado exitosamente.',
             'data' => new UserResource($user->fresh('profile')),
+        ]);
+    }
+
+    /**
+     * Agrega una cancha a la lista de favoritos del usuario.
+     */
+    #[OA\Post(
+        path: "/api/profile/favorite-courts",
+        summary: "Agregar cancha a favoritos",
+        security: [["bearerAuth" => []]],
+        tags: ["Perfil de Usuario"],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["court_id"],
+                properties: [
+                    new OA\Property(property: "court_id", type: "integer", example: 1, description: "ID de la cancha a agregar a favoritos")
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Cancha agregada a favoritos exitosamente"),
+            new OA\Response(response: 401, description: "No autenticado"),
+            new OA\Response(response: 404, description: "Cancha no encontrada"),
+            new OA\Response(response: 409, description: "La cancha ya está en favoritos"),
+            new OA\Response(response: 422, description: "Error de validación")
+        ]
+    )]
+    public function addFavoriteCourt(Request $request): JsonResponse
+    {
+        $request->validate(["court_id" => "required|exists:courts,id"]);
+
+        $user = $request->user();
+        $courtId = $request->court_id;
+
+        if ($user->favoriteCourts()->where("court_id", $courtId)->exists()) {
+            return response()->json(["message" => "La cancha ya está en favoritos."], 409);
+        }
+
+        $user->favoriteCourts()->attach($courtId);
+
+        return response()->json(["message" => "Cancha agregada a favoritos exitosamente."], 200);
+    }
+
+    /**
+     * Elimina una cancha de la lista de favoritos del usuario.
+     */
+    #[OA\Delete(
+        path: "/api/profile/favorite-courts/{courtId}",
+        summary: "Eliminar cancha de favoritos",
+        security: [["bearerAuth" => []]],
+        tags: ["Perfil de Usuario"],
+        parameters: [
+            new OA\Parameter(
+                name: "courtId",
+                in: "path",
+                required: true,
+                description: "ID de la cancha a eliminar de favoritos",
+                schema: new OA\Schema(type: "integer")
+            )
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Cancha eliminada de favoritos exitosamente"),
+            new OA\Response(response: 401, description: "No autenticado"),
+            new OA\Response(response: 404, description: "Cancha no encontrada en favoritos"),
+        ]
+    )]
+    public function removeFavoriteCourt(int $courtId, Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->favoriteCourts()->where("court_id", $courtId)->exists()) {
+            return response()->json(["message" => "La cancha no está en favoritos."], 404);
+        }
+
+        $user->favoriteCourts()->detach($courtId);
+
+        return response()->json(["message" => "Cancha eliminada de favoritos exitosamente."], 200);
+    }
+
+    /**
+     * Obtiene la lista de canchas favoritas del usuario autenticado.
+     */
+    #[OA\Get(
+        path: "/api/profile/favorite-courts",
+        summary: "Listar canchas favoritas",
+        security: [["bearerAuth" => []]],
+        tags: ["Perfil de Usuario"],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Lista de canchas favoritas",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "success", type: "boolean", example: true),
+                        new OA\Property(
+                            property: "data",
+                            type: "array",
+                            items: new OA\Items(ref: "#/components/schemas/CourtResource")
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: "No autenticado"),
+        ]
+    )]
+    public function getFavoriteCourts(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $favoriteCourts = $user->favoriteCourts()->with("club")->get();
+
+        return response()->json([
+            "success" => true,
+            "data" => CourtResource::collection($favoriteCourts),
         ]);
     }
 }

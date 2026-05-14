@@ -105,6 +105,18 @@ class MatchmakingService
                   ->where('skill_level_max', '>=', $filters['skill_level']);
         }
 
+        if (!empty($filters['sport_type'])) {
+            $query->whereHas('court', function ($q) use ($filters) {
+                $q->where('sport_type', $filters['sport_type']);
+            });
+        }
+
+        if (!empty($filters['date'])) {
+            $query->whereHas('booking', function ($q) use ($filters) {
+                $q->where('booking_date', $filters['date']);
+            });
+        }
+
         return $query->paginate($filters['per_page'] ?? 15);
     }
 

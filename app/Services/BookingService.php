@@ -181,6 +181,7 @@ class BookingService
                 'start_time' => $current->format('H:i'),
                 'end_time' => $slotEnd->format('H:i'),
                 'available' => $isAvailable,
+                'price_per_hour' => $court->price_per_hour, // Añadimos el precio por hora de la cancha
             ];
 
             $current->addMinutes($durationMinutes);

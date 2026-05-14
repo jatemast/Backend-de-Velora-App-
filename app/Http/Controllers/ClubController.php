@@ -7,6 +7,7 @@ use App\Http\Resources\ClubResource;
 use App\Services\ClubService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class ClubController extends Controller
 {
@@ -14,6 +15,79 @@ class ClubController extends Controller
         protected ClubService $clubService
     ) {}
 
+    #[OA\Get(
+        path: "/api/clubs",
+        summary: "Listar clubes",
+        description: "Obtiene una lista paginada de clubes, con opciones de filtrado.",
+        operationId: "listClubs",
+        tags: ["Clubs"],
+        parameters: [
+            new OA\Parameter(
+                name: "city",
+                in: "query",
+                required: false,
+                description: "Filtrar por ciudad",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "country",
+                in: "query",
+                required: false,
+                description: "Filtrar por país",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "search",
+                in: "query",
+                required: false,
+                description: "Buscar por nombre o descripción del club",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "sport",
+                in: "query",
+                required: false,
+                description: "Filtrar por tipo de deporte (ej. Padel, Fútbol, Tenis, Voley)",
+                schema: new OA\Schema(type: "string")
+            ),
+            new OA\Parameter(
+                name: "has_courts_for_sport",
+                in: "query",
+                required: false,
+                description: "Filtrar clubes que tienen canchas para un deporte específico (requiere el parámetro 'sport')",
+                schema: new OA\Schema(type: "boolean")
+            ),
+            new OA\Parameter(
+                name: "per_page",
+                in: "query",
+                required: false,
+                description: "Número de resultados por página",
+                schema: new OA\Schema(type: "integer", default: 15)
+            )
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Lista de clubes obtenida exitosamente",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "success", type: "boolean", example: true),
+                        new OA\Property(property: "data", type: "array", items: new OA\Items(ref: "#/components/schemas/ClubResource")),
+                        new OA\Property(
+                            property: "meta",
+                            type: "object",
+                            properties: [
+                                new OA\Property(property: "current_page", type: "integer"),
+                                new OA\Property(property: "last_page", type: "integer"),
+                                new OA\Property(property: "per_page", type: "integer"),
+                                new OA\Property(property: "total", type: "integer"),
+                            ]
+                        )
+                    ]
+                )
+            )
+        ]
+    )]
     /**
      * Listar clubs.
      */
